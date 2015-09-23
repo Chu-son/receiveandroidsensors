@@ -64,7 +64,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="receiveAndroidSensors.cpp" />
     <ClCompile Include="receive_android_sensors.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="receiveAndroidSensors.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

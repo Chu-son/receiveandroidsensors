@@ -3,8 +3,15 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-#define COM_PORT		"COM7"		// 通信ポートの指定
+#include <iostream>
+#include <string>
+
+#include "receiveAndroidSensors.h"
+
+#define COM_PORT		"COM12"		// 通信ポートの指定
 #pragma warning(disable : 4996)
+
+using namespace std;
 
 
 /*----------------------------------------------------------------------------*/
@@ -50,16 +57,28 @@ HANDLE CommOpen(char *pport)
 
 
 	// 通信ポートを開く
-	hComm = CreateFileA(pport,
+	string com = "\\\\.\\COM" + to_string(12);
+	hComm = CreateFile(com.c_str(),
 		GENERIC_READ | GENERIC_WRITE,
 		0,
 		NULL,
 		OPEN_EXISTING,
 		0,
 		NULL);
+
 	// ハンドルの確認
 	if (hComm == INVALID_HANDLE_VALUE){
 		hComm = NULL;
+		LPVOID lpMsgBuf;
+		FormatMessage(				//エラー表示文字列作成
+			FORMAT_MESSAGE_ALLOCATE_BUFFER |
+			FORMAT_MESSAGE_FROM_SYSTEM |
+			FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL, GetLastError(),
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			(LPTSTR)&lpMsgBuf, 0, NULL);
+
+		MessageBox(NULL, (const char*)lpMsgBuf, NULL, MB_OK);	//メッセージ表示
 		goto FuncEnd;
 	}
 
@@ -170,7 +189,7 @@ int getAndroidSensors(HANDLE hComm , float& latitude , float& longitude)
 		pitch = pitch / 100 - 180;
 		roll = roll / 100 - 180;
 
-		//printf("--orientation--\n %.2f , %.2f , %.2f \n", azimuth, pitch, roll);
+		printf("--orientation--\n %.2f , %.2f , %.2f \n", azimuth, pitch, roll);
 	}
 	else if (readbuf[0] == 3){
 		latitude = (readbuf[1] << 24) + (readbuf[2] << 16) + (readbuf[3] << 8) + readbuf[4];
@@ -188,7 +207,7 @@ int getAndroidSensors(HANDLE hComm , float& latitude , float& longitude)
 	return 0;
 }
 
-void main()
+void unkomain()
 {
 	HANDLE		hComm = NULL;		// 通信用ハンドル
 	int			ret = 0;			// リターン用
@@ -211,4 +230,15 @@ void main()
 	CommClose(hComm);
 
 	z = getchar();
+}
+
+void main()
+{
+	rcvAndroidSensors rcvDroid(12);
+
+	while (true)
+	{
+		rcvDroid.getSensorData();
+	}
+
 }
