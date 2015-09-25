@@ -66,9 +66,11 @@
   <ItemGroup>
     <ClCompile Include="receiveAndroidSensors.cpp" />
     <ClCompile Include="receive_android_sensors.cpp" />
+    <ClCompile Include="Timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="receiveAndroidSensors.h" />
+    <ClInclude Include="Timer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

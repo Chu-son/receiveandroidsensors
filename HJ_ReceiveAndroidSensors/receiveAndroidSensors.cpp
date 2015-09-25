@@ -9,6 +9,27 @@ rcvAndroidSensors::rcvAndroidSensors( int comport)
 	COM = comport;
 
 	comOpen();
+
+	timerGPS.Start();
+	timerAttitude.Start();
+
+	timeCountGPS = 0;
+	timeCountAttitude = 0;
+
+	ofsGPS.open("GPSdata_" + timerGPS.getNowTime() + ".csv");
+	ofsAttitude << timerGPS.getNowTime() << ","
+		<< "Latitude,"
+		<< "Longitude,"
+		<< "Accuracy," << endl;
+
+	ofsAttitude.open("AttitudeData_" + timerAttitude.getNowTime() + ".csv");
+	ofsAttitude << timerAttitude.getNowTime() << ","
+		<< "Azimuth,"
+		<< "Pitch,"
+		<< "Roll," << endl;
+
+	minSaveInterval = 5000;
+
 }
 rcvAndroidSensors::~rcvAndroidSensors()
 {
@@ -53,7 +74,8 @@ void rcvAndroidSensors::comOpen()
 		comClose();
 		hComm = NULL;
 	}
-	cDcb.BaudRate = 115200;				// 通信速度
+	//cDcb.BaudRate = 115200;				// 通信速度
+	cDcb.BaudRate = 9600;				// 通信速度
 	cDcb.ByteSize = 8;					// データビット長
 	cDcb.fParity = TRUE;				// パリティチェック
 	cDcb.Parity = NOPARITY;			// ノーパリティ
@@ -98,7 +120,7 @@ void rcvAndroidSensors::comClose()
 
 void rcvAndroidSensors::getSensorData()
 {
-	unsigned char	sendbuf[128] = { (unsigned char)1, (unsigned char)1, };
+	unsigned char	sendbuf[128] = { (byte)0x01, (unsigned char)1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, };
 	unsigned char	readbuf[128] = {};
 	unsigned char	sum;
 	int				i;
@@ -111,16 +133,16 @@ void rcvAndroidSensors::getSensorData()
 	if (!hComm){
 		return;
 	}
+	/*{
+		// バッファクリア
+		memset(sendbuf, 0x00, sizeof(sendbuf));
 
-	// バッファクリア
-	memset(sendbuf, 0x00, sizeof(sendbuf));
+		// 通信バッファクリア
+		PurgeComm(hComm, PURGE_RXCLEAR);
 
-	// 通信バッファクリア
-	PurgeComm(hComm, PURGE_RXCLEAR);
-
-	// 送信
-	ret = WriteFile(hComm, &sendbuf, 2, &len, NULL);
-
+		// 送信
+		ret = WriteFile(hComm, &sendbuf, 10, &len, NULL);
+	}*/
 	// 読み込み
 	memset(readbuf, 0x00, sizeof(readbuf));
 	readlen = 11;
@@ -128,8 +150,7 @@ void rcvAndroidSensors::getSensorData()
 
 	ret = ReadFile(hComm, readbuf, readlen, &len, NULL);
 
-	//printf("\t< %d > datas! \n",len);
-
+	// GPSのデータ
 	if (readbuf[0] == 1){
 		//データ復元
 		dLatitude = (readbuf[1] << 16) + (readbuf[2] << 8) + readbuf[3];
@@ -140,27 +161,56 @@ void rcvAndroidSensors::getSensorData()
 		if ((readbuf[9] & 1) > 0) dLatitude = -dLatitude;
 		if ((readbuf[9] & 2) > 0) dLongitude = -dLongitude;
 
+		//桁合わせ
 		dLatitude /= 100000;
 		dLongitude /= 100000;
 		mAccuracy /= 10;
 
+		// 返ってくるのは変位なので積算
 		mLatitude += dLatitude;
 		mLongitude += dLongitude;
 
 		printf("--GPS変位--\n %.6f , %.6f \n", dLatitude, dLongitude);
 		printf("--GPS絶対値--\n %.6f , %.6f , %.1f \n\n", mLatitude, mLongitude, mAccuracy);
+
+		// 指定された間隔で保存
+		timeCountGPS += timerGPS.getLapTime();
+		if (timeCountGPS > minSaveInterval)
+		{
+			ofsGPS << timerGPS.getNowTime() << ","
+				<< mLatitude << ","
+				<< mLongitude << ","
+				<< mAccuracy << "," << endl;
+		}
+
 	}
+	// 姿勢のデータ
 	else if (readbuf[0] == 2){
+		// データの復元
 		mAzimuth = (readbuf[1] << 8) + readbuf[2];
 		mPitch = (readbuf[3] << 8) + readbuf[4];
 		mRoll = (readbuf[5] << 8) + readbuf[6];
 
+		// 桁合わせと-180～180に変換
 		mAzimuth = mAzimuth / 100 - 180;
 		mPitch = mPitch / 100 - 180;
 		mRoll = mRoll / 100 - 180;
 
-		printf("--orientation--\n %.2f , %.2f , %.2f \n", mAzimuth, mPitch, mRoll);
+		//printf("--orientation--\n %.2f , %.2f , %.2f \n", mAzimuth, mPitch, mRoll);
+
+		// 指定間隔で保存
+		timeCountAttitude += timerAttitude.getLapTime();
+		if (timeCountAttitude > minSaveInterval)
+		{
+			ofsAttitude << timerAttitude.getNowTime() << ","
+				<< mAzimuth	<< ","
+				<< mPitch	<< ","
+				<< mRoll	<< "," << endl;
+			cout << "⊂二二二（ ＾ω＾）二⊃ 保存したﾌﾞｰﾝ" << endl;
+		}
+
 	}
+	// GPSの初期値
 	else if (readbuf[0] == 3){
 		mLatitude = (readbuf[1] << 24) + (readbuf[2] << 16) + (readbuf[3] << 8) + readbuf[4];
 		mLongitude = (readbuf[5] << 24) + (readbuf[6] << 16) + (readbuf[7] << 8) + readbuf[8];
@@ -171,5 +221,19 @@ void rcvAndroidSensors::getSensorData()
 		mAccuracy = mAccuracy / 10;
 
 		printf("--firstGPS--\n %.6f , %.6f , %.1f \n\n", mLatitude, mLongitude, mAccuracy);
+		timeCountGPS += timerGPS.getLapTime();
+		if (timeCountGPS > minSaveInterval)
+		{
+			ofsGPS << timerGPS.getNowTime() << ","
+				<< mLatitude	<< ","
+				<< mLongitude	<< ","
+				<< mAccuracy	<< "," << endl;
+		}
+
 	}
+}
+
+void rcvAndroidSensors::setSaveMinInterval(int interval)
+{
+	minSaveInterval = interval;
 }
