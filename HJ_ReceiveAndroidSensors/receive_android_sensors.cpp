@@ -234,11 +234,15 @@ void unkomain()
 
 void main()
 {
-	rcvAndroidSensors rcvDroid(12);
+	float dummy[3] = { 0 };
+
+	rcvAndroidSensors rcvDroid(14);
 
 	while (true)
 	{
-		rcvDroid.getSensorData();
+		//rcvDroid.getSensorData();
+		rcvDroid.getAttitudeData(dummy);
+		Sleep(2000);
 	}
 
 }

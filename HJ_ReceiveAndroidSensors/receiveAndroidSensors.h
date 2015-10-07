@@ -1,11 +1,12 @@
 #ifndef _INC_RCVDROIDSENSORS
 #define _INC_RCVDROIDSENSORS
 
-// 2015/09/25
+// 2015/10/07
 
 #include <fstream>
 #include <Windows.h>
 #include "Timer.h"
+#include "SharedMemory.h"
 
 class rcvAndroidSensors
 {
@@ -29,15 +30,21 @@ private:
 	ofstream	ofsAttitude;
 	int		timeCountAttitude;
 
+	// 共有メモリ系
+	bool	isSaveSharedMemory;
+	const string shMemName = "AndroidSensors";
+	SharedMemory<float> shMem;
+	enum {ISSAVE , LATITUDE , LONGITUDE , ACCURACY , AZIMUTH , PITCH , ROLL};
+
 	// その他
 	int		minSaveInterval;
-
 
 	// privateメソッド
 	// シリアルポートを開く
 	void	comOpen();
 	// ポートを閉じる
 	void	comClose();
+
 public:
 	//publicメソッド
 	rcvAndroidSensors( int comport );
@@ -49,6 +56,7 @@ public:
 	// データを取得するか設定
 	void	setGPSData(bool isGetdata);
 	void	setAttitudeData(bool isGetdata);
+	void	setIsSaveSharedMemory(bool isSaveSharedMemory);
 
 	// 保存の最低間隔[msec]
 	void	setSaveMinInterval(int interval);

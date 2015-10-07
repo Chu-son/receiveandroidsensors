@@ -4,7 +4,9 @@
 
 using namespace std;
 
-rcvAndroidSensors::rcvAndroidSensors( int comport)
+// 2015/10/27
+
+rcvAndroidSensors::rcvAndroidSensors(int comport) : shMem(shMemName)
 {
 	COM = comport;
 
@@ -133,16 +135,16 @@ void rcvAndroidSensors::getSensorData()
 	if (!hComm){
 		return;
 	}
-	/*{
+	{
 		// バッファクリア
-		memset(sendbuf, 0x00, sizeof(sendbuf));
+		//memset(sendbuf, 0x01, sizeof(sendbuf));
 
 		// 通信バッファクリア
 		PurgeComm(hComm, PURGE_RXCLEAR);
 
 		// 送信
 		ret = WriteFile(hComm, &sendbuf, 10, &len, NULL);
-	}*/
+	}
 	// 読み込み
 	memset(readbuf, 0x00, sizeof(readbuf));
 	readlen = 11;
@@ -220,7 +222,7 @@ void rcvAndroidSensors::getSensorData()
 		mLongitude = mLongitude / 1000000;
 		mAccuracy = mAccuracy / 10;
 
-		printf("--firstGPS--\n %.6f , %.6f , %.1f \n\n", mLatitude, mLongitude, mAccuracy);
+		printf("--GPS--\n %.6f , %.6f , %.1f \n\n", mLatitude, mLongitude, mAccuracy);
 		timeCountGPS += timerGPS.getLapTime();
 		if (timeCountGPS > minSaveInterval)
 		{
@@ -237,3 +239,70 @@ void rcvAndroidSensors::setSaveMinInterval(int interval)
 {
 	minSaveInterval = interval;
 }
+
+void	rcvAndroidSensors::getAttitudeData(float retArray[3])
+{
+	unsigned char	sendbuf[] = { 0x00, };
+	unsigned char	readbuf[128] = {};
+	unsigned char	sum;
+	int				ret;
+	unsigned long	len, readlen;
+
+
+	// ハンドルチェック
+	if (!hComm){
+		return;
+	}
+	
+	// バッファクリア
+	memset(sendbuf, 0x02, sizeof(sendbuf));
+
+	// 通信バッファクリア
+	PurgeComm(hComm, PURGE_RXCLEAR);
+
+	// 送信
+	ret = WriteFile(hComm, &sendbuf, 1, &len, NULL);
+
+	// 読み込み
+	memset(readbuf, 0x00, sizeof(readbuf));
+	readlen = 11;
+	len = 0;
+
+	ret = ReadFile(hComm, readbuf, readlen, &len, NULL);
+
+	// 姿勢のデータ
+	if (readbuf[0] == 2){
+		// データの復元
+		mAzimuth = (readbuf[1] << 8) + readbuf[2];
+		mPitch = (readbuf[3] << 8) + readbuf[4];
+		mRoll = (readbuf[5] << 8) + readbuf[6];
+
+		// 桁合わせと-180～180に変換
+		mAzimuth = mAzimuth / 100 - 180;
+		mPitch = mPitch / 100 - 180;
+		mRoll = mRoll / 100 - 180;
+
+		printf("--orientation--\n %.2f , %.2f , %.2f \n", mAzimuth, mPitch, mRoll);
+
+		// 指定間隔で保存
+		timeCountAttitude += timerAttitude.getLapTime();
+		if (timeCountAttitude > minSaveInterval)
+		{
+			ofsAttitude << timerAttitude.getNowTime() << ","
+				<< mAzimuth << ","
+				<< mPitch << ","
+				<< mRoll << "," << endl;
+			cout << "⊂二二二（ ＾ω＾）二⊃ 保存したﾌﾞｰﾝ" << endl;
+		}
+
+		if (isSaveSharedMemory)
+		{
+			shMem.setShMemData(mAzimuth, AZIMUTH);
+			shMem.setShMemData(mPitch, PITCH);
+			shMem.setShMemData(mRoll, ROLL);
+		}
+
+	}
+	
+}
+
